@@ -120,11 +120,17 @@
   #dog-body { animation: dog-breathe 2s ease-in-out infinite; transform-origin: center bottom; }
 
   /* Stars */
-  .ambient { fill: #fff; opacity: 0; transition: opacity 1s; }
+  .ambient { fill: #fff; opacity: 0; transition: opacity 1s, r 0.3s, fill 0.3s; cursor: pointer; pointer-events: all; }
   .ambient.lit { opacity: 0.55; }
-  .target { fill: var(--accent); opacity: 0; transition: opacity 0.8s; filter: drop-shadow(0 0 6px rgba(255,210,122,0.9)); }
-  .target.lit { opacity: 1; }
+  .ambient:hover { r: 3; opacity: 1; fill: var(--accent); }
+  .ambient.ping { animation: star-ping 0.4s ease-out; }
+  @keyframes star-ping { 0% { r: 2; opacity: 1; } 100% { r: 12; opacity: 0; } }
+
+  .target { fill: var(--accent); opacity: 0; transition: opacity 0.8s, r 0.2s; filter: drop-shadow(0 0 6px rgba(255,210,122,0.9)); }
+  .target.lit { opacity: 0.6; }
+  .target.active { opacity: 1; r: 8; filter: drop-shadow(0 0 12px var(--accent)); }
   .target.reveal-pulse { animation: target-pulse 0.5s ease-in-out; }
+
   @keyframes target-pulse { 0%,100% { r: 4; } 50% { r: 7; } }
 
   .target-hit { fill: transparent; pointer-events: all; cursor: pointer; }
@@ -376,7 +382,14 @@
     function renderAmbient() {
       const sel = ambientLayer.selectAll("circle.ambient").data(ambient, d => d.id);
       sel.enter().append("circle").attr("class", "ambient")
-        .attr("cx", d => d.x).attr("cy", d => d.y).attr("r", d => d.r);
+        .attr("cx", d => d.x).attr("cy", d => d.y).attr("r", d => d.r)
+        .on("pointerdown", (ev, d) => {
+          if (!d.lit) return;
+          Haptic.soft();
+          const el = d3.select(ev.currentTarget);
+          el.classed("ping", true);
+          setTimeout(() => el.classed("ping", false), 400);
+        });
       ambientLayer.selectAll("circle.ambient")
         .attr("cx", d => d.x).attr("cy", d => d.y).attr("r", d => d.r)
         .classed("lit", d => d.lit);
@@ -431,8 +444,13 @@
     }
 
     svg.on("pointermove", (ev) => {
-      if (dragFromIdx === null) return;
       const [x, y] = d3.pointer(ev, svg.node());
+      
+      // Visual feedback: highlight nearest star even if not dragging
+      const hoverIdx = nearestTargetIdx(x, y, 28);
+      targetLayer.selectAll("circle.target").classed("active", (d, i) => i === hoverIdx);
+
+      if (dragFromIdx === null) return;
       cursorPoint = [x, y];
       renderLinks();
     });
@@ -454,6 +472,7 @@
       }
       dragFromIdx = null;
       cursorPoint = null;
+      targetLayer.selectAll("circle.target").classed("active", false);
       try { svg.node().releasePointerCapture(ev.pointerId); } catch (e) {}
       renderLinks();
     });
@@ -461,7 +480,7 @@
     function nearestTargetIdx(x, y, threshold) {
       let best = null, bestD = threshold;
       targets.forEach(t => {
-        if (!t.lit) return;
+        if (!t.lit && !revealed) return;
         const d = Math.hypot(t.x - x, t.y - y);
         if (d < bestD) { bestD = d; best = t.idx; }
       });
@@ -477,26 +496,26 @@
       }
     }
 
-    // Progressive reveal of stars as song plays (up to 50% of song)
+    // Progressive reveal of stars as song plays
     function revealFromProgress() {
       if (!introComplete) return;
       const t = position / Math.max(duration, 1);
-      // ambient stars appear over first 50% of song
-      const ambT = Math.min(t / 0.5, 1);
+      // ambient stars appear over first 30% of song
+      const ambT = Math.min(t / 0.3, 1);
       const ambLit = Math.floor(ambT * AMBIENT_COUNT);
       let changed = false;
       for (let i = 0; i < AMBIENT_COUNT; i++) {
         const shouldLit = i < ambLit;
         if (ambient[i].lit !== shouldLit) { ambient[i].lit = shouldLit; changed = true; }
       }
-      // target stars appear in the last 30% of the reveal window (0.2 → 0.5)
-      const targetLit = Math.floor(Math.max(0, (t - 0.2) / 0.3) * targets.length);
+      // target stars appear much earlier (0.05 → 0.25)
+      const targetLit = Math.floor(Math.max(0, (t - 0.05) / 0.20) * targets.length);
       for (let i = 0; i < targets.length; i++) {
         const shouldLit = i < targetLit;
         if (targets[i].lit !== shouldLit) { targets[i].lit = shouldLit; changed = true; }
       }
-      // trigger constellation blink at 50%
-      if (t >= 0.5 && !revealed) {
+      // trigger constellation blink at 30%
+      if (t >= 0.3 && !revealed) {
         revealed = true;
         targets.forEach(t => t.lit = true);
         flashConstellation();
