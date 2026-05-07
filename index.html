@@ -562,6 +562,14 @@
       cd.classList.toggle("urgent", remaining < 30000);
 
       if (!previewWarned && position >= PREVIEW_LIMIT_MS - 1500 && duration <= PREVIEW_LIMIT_MS + 500) {
+        const hasToken = document.cookie.includes('sp_token');
+        if (hasToken) {
+          const prompt = document.getElementById("login-prompt");
+          prompt.querySelector('.big').textContent = "Spotify restricted the playback";
+          prompt.querySelector('.sub').textContent = "We see you're logged in, but the Spotify player requires you to log into their website directly to play full tracks here. Open spotify.com in another tab, then refresh this page.";
+          prompt.querySelector('.cta').textContent = "Open Spotify Web Player";
+          prompt.querySelector('.cta').href = "https://open.spotify.com";
+        }
         document.getElementById("login-prompt").classList.add("show");
         previewWarned = true;
       }
