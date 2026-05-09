@@ -562,7 +562,7 @@
       cd.classList.toggle("urgent", remaining < 30000);
 
       if (!previewWarned && position >= PREVIEW_LIMIT_MS - 1500 && duration <= PREVIEW_LIMIT_MS + 500) {
-        const hasToken = document.cookie.includes('sp_token');
+        const hasToken = document.cookie.includes('sp_token_v2');
         if (hasToken) {
           const prompt = document.getElementById("login-prompt");
           prompt.querySelector('.big').textContent = "Spotify restricted the playback";
@@ -625,12 +625,17 @@
     window.onSpotifyIframeApiReady = (IFrameAPI) => {
       const el = document.getElementById("player");
       IFrameAPI.createController(el, { uri: TRACK_URI, width: "100%", height: 80 }, (ctrl) => {
+        window._iframeCtrl = ctrl;
         ctrl.addListener("playback_update", (e) => {
           position = e.data.position || 0;
           duration = e.data.duration || 1;
           isPlaying = !e.data.isPaused;
           updateChrome();
           if (isPlaying && !introStarted) runIntro();
+          if (isPlaying) {
+            const vc = document.getElementById('vol-controls');
+            if (vc && vc.style.display !== 'flex') vc.style.display = 'flex';
+          }
         });
       });
     };
@@ -650,7 +655,7 @@
         const btn = document.createElement('button');
         btn.textContent = '↺ tilt';
         btn.setAttribute('aria-label', 'Enable tilt controls');
-        btn.style.cssText = 'position:fixed;bottom:100px;right:16px;z-index:9999;background:rgba(0,0,0,0.8);color:rgba(255,210,122,0.9);border:1px solid rgba(255,210,122,0.3);border-radius:20px;padding:7px 14px;font-size:11px;font-family:monospace;letter-spacing:.05em;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);';
+        btn.style.cssText = 'position:fixed;bottom:140px;right:16px;z-index:9999;background:rgba(0,0,0,0.8);color:rgba(255,210,122,0.9);border:1px solid rgba(255,210,122,0.3);border-radius:20px;padding:7px 14px;font-size:11px;font-family:monospace;letter-spacing:.05em;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);';
         document.body.appendChild(btn);
         btn.addEventListener('click', async () => { if (await Motion.start()) btn.remove(); });
       } else {
@@ -658,6 +663,27 @@
       }
     }
   </script>
-<a href="https://bandmusicgames.party" style="position:fixed;bottom:16px;right:16px;z-index:9999;padding:8px 16px;background:linear-gradient(135deg,#a855f7,#ec4899);color:#fff;border-radius:20px;font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:700;letter-spacing:0.1em;text-decoration:none;box-shadow:0 4px 12px rgba(168,85,247,0.4);">← LOBBY</a>
+<div id="vol-controls" style="display:none;position:fixed;top:76px;left:12px;z-index:9999;flex-direction:row;align-items:center;gap:8px;background:rgba(5,8,16,0.75);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:6px 14px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);">
+  <button id="vol-down" style="background:none;border:none;color:rgba(255,255,255,0.55);font-size:16px;cursor:pointer;padding:2px 4px;line-height:1;touch-action:manipulation;">−</button>
+  <button id="mute-btn" style="background:none;border:none;color:#fff;font-size:16px;cursor:pointer;padding:2px 4px;line-height:1;touch-action:manipulation;">🔊</button>
+  <button id="vol-up" style="background:none;border:none;color:rgba(255,255,255,0.55);font-size:16px;cursor:pointer;padding:2px 4px;line-height:1;touch-action:manipulation;">+</button>
+</div>
+<script>
+(function(){
+  let _vol = 0.75, _muted = false;
+  const muteBtn = document.getElementById('mute-btn');
+  const volDown = document.getElementById('vol-down');
+  const volUp   = document.getElementById('vol-up');
+  function applyVol() {
+    const v = _muted ? 0 : _vol;
+    if (window._iframeCtrl) window._iframeCtrl.setVolume(v);
+    muteBtn.textContent = _muted ? '🔇' : '🔊';
+  }
+  muteBtn.addEventListener('click', () => { _muted = !_muted; applyVol(); });
+  volDown.addEventListener('click', () => { _muted = false; _vol = Math.max(0, _vol - 0.15); applyVol(); });
+  volUp.addEventListener('click', () => { _muted = false; _vol = Math.min(1, _vol + 0.15); applyVol(); });
+})();
+</script>
+<a href="https://bandmusicgames.party" style="position:fixed;bottom:96px;right:16px;z-index:9999;padding:8px 16px;background:linear-gradient(135deg,#a855f7,#ec4899);color:#fff;border-radius:20px;font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:700;letter-spacing:0.1em;text-decoration:none;box-shadow:0 4px 12px rgba(168,85,247,0.4);">← LOBBY</a>
 </body>
 </html>
