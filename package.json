@@ -1,0 +1,9 @@
+{
+  "name": "francis-darger",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npx --yes vite@4 --host 127.0.0.1 --port 8083",
+    "deploy": "npx wrangler pages deploy . --project-name francis-darger --branch main"
+  }
+}
