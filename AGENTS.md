@@ -15,4 +15,4 @@
 
 - Keep generated files out of git: `.wrangler/`, `node_modules/`, and `.DS_Store` stay ignored.
 - Commit web gameplay changes here before handing off or deploying.
-- The current local `origin` points to `ashrocket/francis`, which is not available on GitHub. Fix the remote before relying on push-based deploys.
+- `origin` points to `https://github.com/ashrocket/francis.git`. GitHub Actions deploys require `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repo secrets.
