@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
 <title>Francis — Darger</title>
 <style>
   :root {
@@ -31,13 +31,13 @@
     user-select: none;
   }
 
-  #hud { position: absolute; top: 16px; left: 16px; font-size: 13px; line-height: 1.4; max-width: 340px; pointer-events: none; opacity: 0; transition: opacity 0.6s; }
+  #hud { position: absolute; top: max(16px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); font-size: 13px; line-height: 1.4; max-width: 340px; pointer-events: none; opacity: 0; transition: opacity 0.6s; }
   #hud.show { opacity: 1; }
   #hud h1 { font-size: 15px; font-weight: 500; margin: 0 0 2px; }
   #hud .artist { color: var(--dim); font-size: 12px; }
   #hud .hint { color: var(--dim); margin-top: 10px; font-size: 12px; }
 
-  #counter { position: absolute; top: 16px; right: 16px; font-size: 12px; color: var(--dim); text-align: right; font-variant-numeric: tabular-nums; opacity: 0; transition: opacity 0.6s; }
+  #counter { position: absolute; top: max(16px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); font-size: 12px; color: var(--dim); text-align: right; font-variant-numeric: tabular-nums; opacity: 0; transition: opacity 0.6s; }
   #counter.show { opacity: 1; }
   #counter .score { color: var(--ink); font-size: 14px; font-weight: 500; }
   #counter .countdown { margin-top: 2px; color: var(--accent); font-weight: 500; }
@@ -137,6 +137,7 @@
   .user-link { stroke: var(--line); stroke-width: 1.5; stroke-linecap: round; filter: drop-shadow(0 0 3px rgba(245,180,97,0.4)); }
   .user-link.correct { stroke: #a6f0a6; filter: drop-shadow(0 0 5px rgba(166,240,166,0.6)); }
   .user-link.wrong { stroke: var(--warn); opacity: 0.6; }
+  .user-link.fading { opacity: 0; transition: opacity 0.45s; }
   .pending-link { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 4; opacity: 0.6; pointer-events: none; }
   .reveal-link { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 2 6; stroke-linecap: round; opacity: 0; transition: opacity 0.3s; }
   .reveal-link.flash { opacity: 0.9; }
@@ -206,6 +207,15 @@
   .card-face .score-line { color: var(--ink); font-size: 14px; margin-bottom: 18px; padding: 10px 14px; background: rgba(255,210,122,0.08); border-radius: 8px; border-left: 3px solid var(--accent); }
   .card-face p { color: var(--ink); font-size: 14px; line-height: 1.6; margin: 0 0 12px; opacity: 0.85; }
   .card-face .stars-list { color: var(--dim); font-size: 11px; line-height: 1.8; margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(255,210,122,0.15); }
+  .card-face .action-btn {
+    margin-top: 16px;
+    background: var(--accent); color: #1a1408;
+    padding: 12px 24px; border-radius: 999px;
+    font-size: 14px; font-weight: 600; letter-spacing: 0.02em;
+    text-align: center; cursor: pointer; border: none;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .card-face .action-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(255,210,122,0.4); }
 </style>
 </head>
 <body>
@@ -350,7 +360,7 @@
   </div>
 
   <div id="counter">
-    <div class="score"><strong id="matched">0</strong> / 4</div>
+    <div class="score"><strong id="matched">0</strong> / <span id="total-edges">4</span></div>
     <div class="countdown" id="countdown">—</div>
   </div>
   <div id="progress"><div id="progress-fill"></div></div>
@@ -366,20 +376,15 @@
 
   <div id="card-scene">
     <div id="card">
-      <div class="card-face card-back">CASSIOPEIA</div>
+      <div class="card-face card-back" id="card-back">CASSIOPEIA</div>
       <div class="card-face card-front">
-        <h2>Cassiopeia</h2>
-        <div class="latin">the Seated Queen</div>
+        <h2 id="card-title">Cassiopeia</h2>
+        <div class="latin" id="card-subtitle">the Seated Queen</div>
         <div class="score-line" id="card-score">—</div>
-        <p>Named for the vain queen of Greek myth, punished by the sea god Poseidon to circle the north celestial pole for eternity, seated on her throne.</p>
-        <p>Her distinctive <strong>W</strong> shape is one of the easiest patterns to find in the northern sky. Visible all year round from most of the Northern Hemisphere, best seen in autumn.</p>
-        <div class="stars-list">
-          <div>α · Schedar · "the breast"</div>
-          <div>β · Caph · "the palm"</div>
-          <div>γ · Gamma Cassiopeiae · unnamed</div>
-          <div>δ · Ruchbah · "the knee"</div>
-          <div>ε · Segin · unnamed</div>
-        </div>
+        <p id="card-desc1"></p>
+        <p id="card-desc2"></p>
+        <div class="stars-list" id="card-stars"></div>
+        <button class="action-btn" id="next-btn" type="button">NEXT</button>
       </div>
     </div>
   </div>
@@ -424,15 +429,32 @@
     const PREVIEW_LIMIT_MS = 30000;
     const AMBIENT_COUNT = 75;
 
-    // Cassiopeia W: 5 stars, 4 canonical edges (0-1, 1-2, 2-3, 3-4)
-    const TARGET_POINTS = [
-      [0.18, 0.35],
-      [0.35, 0.52],
-      [0.52, 0.28],
-      [0.72, 0.62],
-      [0.88, 0.38],
+    const LEVELS = [
+      {
+        name: "Cassiopeia",
+        sub: "the Seated Queen",
+        desc1: "Named for the vain queen of Greek myth, punished by the sea god Poseidon to circle the north celestial pole for eternity, seated on her throne.",
+        desc2: "Her distinctive <strong>W</strong> shape is one of the easiest patterns to find in the northern sky. Visible all year round from most of the Northern Hemisphere, best seen in autumn.",
+        points: [[0.18, 0.35], [0.35, 0.52], [0.52, 0.28], [0.72, 0.62], [0.88, 0.38]],
+        edges: [[0,1],[1,2],[2,3],[3,4]],
+        stars: ["α · Schedar · \"the breast\"", "β · Caph · \"the palm\"", "γ · Gamma Cassiopeiae · unnamed", "δ · Ruchbah · \"the knee\"", "ε · Segin · unnamed"],
+      },
+      {
+        name: "Cygnus",
+        sub: "the Swan",
+        desc1: "One of the most recognizable constellations of the northern summer and autumn sky, featuring a prominent asterism known as the Northern Cross.",
+        desc2: "Deneb, its brightest star, marks the swan's tail and is one of the three stars of the <strong>Summer Triangle</strong>. The swan is often depicted flying south along the Milky Way.",
+        points: [[0.5, 0.15], [0.5, 0.4], [0.2, 0.35], [0.8, 0.45], [0.5, 0.8]],
+        edges: [[0,1],[1,2],[1,3],[1,4]],
+        stars: ["α · Deneb · \"the tail\"", "γ · Sadr · \"the chest\"", "δ · Delta Cygni · unnamed", "ε · Aljanah · \"the wing\"", "β · Albireo · \"the beak\""],
+      },
     ];
-    const CANONICAL_EDGES = [[0,1],[1,2],[2,3],[3,4]];
+
+    let currentLevelIdx = 0;
+    let TARGET_POINTS = LEVELS[0].points;
+    let CANONICAL_EDGES = LEVELS[0].edges;
+    let lastMatchWon = false;
+    let endCheckGraceUntil = 0;
 
     const svg = d3.select("#sky");
     const ambientLayer = svg.append("g").attr("class", "ambient-layer");
@@ -513,6 +535,7 @@
 
     function renderLinks() {
       const sel = linkLayer.selectAll("line.user-link").data(userLinks, d => edgeKey(d.a, d.b));
+      sel.exit().remove();
       const enter = sel.enter().append("line").attr("class", "user-link");
       linkLayer.selectAll("line.user-link")
         .attr("x1", d => targets[d.a].x).attr("y1", d => targets[d.a].y)
@@ -563,7 +586,7 @@
         if (!exists) {
           const correct = isCanonical(dragFromIdx, hitIdx);
           userLinks.push({ a: dragFromIdx, b: hitIdx, correct });
-          if (correct) { Haptic.success(); } else { Haptic.error(); }
+          if (correct) { Haptic.success(); } else { Haptic.error(); fadeWrongLink(key); }
           updateScore();
         }
       }
@@ -584,14 +607,65 @@
       return best;
     }
 
+    // Wrong links flash red, then fade away so the sky stays readable.
+    function fadeWrongLink(key) {
+      setTimeout(() => {
+        linkLayer.selectAll("line.user-link")
+          .filter(d => edgeKey(d.a, d.b) === key && !d.correct)
+          .classed("fading", true);
+      }, 700);
+      setTimeout(() => {
+        const i = userLinks.findIndex(l => edgeKey(l.a, l.b) === key && !l.correct);
+        if (i >= 0) { userLinks.splice(i, 1); renderLinks(); }
+      }, 1150);
+    }
+
     function updateScore() {
       const correctCount = userLinks.filter(l => l.correct).length;
       document.getElementById("matched").textContent = correctCount;
-      if (correctCount === 4 && !matchEnded) {
+      if (correctCount === CANONICAL_EDGES.length && !matchEnded) {
         Haptic.heavy();
         endMatch(true);
       }
     }
+
+    function loadLevel(idx) {
+      currentLevelIdx = idx;
+      const level = LEVELS[idx];
+      TARGET_POINTS = level.points;
+      CANONICAL_EDGES = level.edges;
+      userLinks.length = 0;
+      targets.length = 0;
+      level.points.forEach((p, i) => {
+        targets.push({ id: "t" + i, idx: i, nx: p[0], ny: p[1], lit: revealed });
+      });
+      matchEnded = false;
+      document.getElementById("card-scene").classList.remove("show", "flipped");
+      document.getElementById("matched").textContent = "0";
+      document.getElementById("total-edges").textContent = level.edges.length;
+      resize();
+      // Past the 30% mark the progress-driven flash never re-fires, so show the new pattern now.
+      if (revealed) setTimeout(flashConstellation, 900);
+    }
+
+    function onCardAction() {
+      if (lastMatchWon) {
+        if (currentLevelIdx < LEVELS.length - 1) loadLevel(currentLevelIdx + 1);
+        else window.location.href = "https://bandmusicgames.party";
+      } else {
+        // Replay: restart the song and let the level's reveal sequence run again.
+        const ctrl = window._iframeCtrl;
+        try {
+          if (ctrl && typeof ctrl.restart === "function") ctrl.restart();
+          else if (ctrl) { ctrl.seek(0); ctrl.play(); }
+        } catch (e) {}
+        position = 0;
+        endCheckGraceUntil = performance.now() + 4000;
+        revealed = false;
+        loadLevel(currentLevelIdx);
+      }
+    }
+    document.getElementById("next-btn").addEventListener("click", onCardAction);
 
     // Progressive reveal of stars as song plays
     function revealFromProgress() {
@@ -674,18 +748,33 @@
       revealFromProgress();
 
       // Song finished without completing the match
-      if (!matchEnded && position > 0 && duration > 1 && position >= duration - 500) {
+      // (grace window absorbs stale end-of-track updates right after a replay restart)
+      if (!matchEnded && performance.now() > endCheckGraceUntil &&
+          position > 0 && duration > 1 && position >= duration - 500) {
         endMatch(false);
       }
     }
 
     function endMatch(won) {
       matchEnded = true;
+      lastMatchWon = won;
+      // On a 30s preview the login prompt is already up — don't stack the card on top of it.
+      if (!won && previewWarned && duration <= PREVIEW_LIMIT_MS + 500) return;
+      const level = LEVELS[currentLevelIdx];
+      const total = CANONICAL_EDGES.length;
       const correct = userLinks.filter(l => l.correct).length;
-      const scoreEl = document.getElementById("card-score");
-      scoreEl.textContent = won
-        ? `Perfect match — 4 / 4 lines`
-        : `You matched ${correct} of 4 lines.`;
+      document.getElementById("card-score").textContent = won
+        ? `Perfect match — ${total} / ${total} lines`
+        : `You matched ${correct} of ${total} lines.`;
+      document.getElementById("card-back").textContent = level.name.toUpperCase();
+      document.getElementById("card-title").textContent = level.name;
+      document.getElementById("card-subtitle").textContent = level.sub;
+      document.getElementById("card-desc1").textContent = level.desc1;
+      document.getElementById("card-desc2").innerHTML = level.desc2;
+      document.getElementById("card-stars").innerHTML = level.stars.map(s => `<div>${s}</div>`).join("");
+      document.getElementById("next-btn").textContent = won
+        ? (currentLevelIdx < LEVELS.length - 1 ? "NEXT CONSTELLATION" : "BACK TO LOBBY")
+        : "PLAY AGAIN";
       document.getElementById("card-scene").classList.add("show");
       // flip after short beat
       setTimeout(() => document.getElementById("card-scene").classList.add("flipped"), 300);
@@ -723,6 +812,7 @@
       const el = document.getElementById("player");
       IFrameAPI.createController(el, { uri: TRACK_URI, width: "100%", height: 80 }, (ctrl) => {
         window._iframeCtrl = ctrl;
+        try { ctrl.setVolume(0.75); } catch (e) {}
         ctrl.addListener("playback_update", (e) => {
           position = e.data.position || 0;
           duration = e.data.duration || 1;
@@ -745,6 +835,32 @@
       // Target stars shift slightly less for depth
       targetLayer.attr("transform", `translate(${tx * 0.55}, ${ty * 0.55})`);
     });
+
+    // Localhost-only test hook: drive the reveal/match flow without Spotify playback.
+    if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+      window._test = {
+        skipIntro() {
+          document.getElementById("intro").style.display = "none";
+          document.getElementById("hud").classList.add("show");
+          document.getElementById("counter").classList.add("show");
+          document.getElementById("progress").classList.add("show");
+          introStarted = true; introComplete = true;
+          renderAmbient(); renderTargets();
+        },
+        setProgress(t, durMs = 200000) {
+          duration = durMs; position = t * durMs;
+          updateChrome();
+        },
+        link(a, b) {
+          const correct = isCanonical(a, b);
+          userLinks.push({ a, b, correct });
+          if (!correct) fadeWrongLink(edgeKey(a, b));
+          updateScore(); renderLinks();
+        },
+        loadLevel, endMatch,
+        state: () => ({ currentLevelIdx, matchEnded, revealed, won: lastMatchWon, links: userLinks.length, lit: targets.map(t => t.lit) }),
+      };
+    }
 
     // Init motion
     if (Motion.isMobile()) {
